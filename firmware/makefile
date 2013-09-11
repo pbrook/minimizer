@@ -18,14 +18,29 @@ F_CPU        = 16000000
 F_USB        = $(F_CPU)
 OPTIMIZATION = s
 TARGET       = AVRISP-MKII
-SRC          = $(TARGET).c AVRISPDescriptors.c Lib/V2Protocol.c Lib/V2ProtocolParams.c Lib/ISP/ISPProtocol.c Lib/ISP/ISPTarget.c Lib/XPROG/XPROGProtocol.c \
-               Lib/XPROG/XPROGTarget.c Lib/XPROG/XMEGANVM.c Lib/XPROG/TINYNVM.c $(LUFA_SRC_USB)
+SRC          = $(TARGET).c minimus_hack.c AVRISPDescriptors.c \
+	       Lib/V2Protocol.c Lib/V2ProtocolParams.c Lib/ISP/ISPProtocol.c Lib/ISP/ISPTarget.c \
+	       Lib/XPROG/XPROGProtocol.c Lib/XPROG/XPROGTarget.c \
+	       Lib/XPROG/XMEGANVM.c Lib/XPROG/TINYNVM.c \
+	       $(LUFA_SRC_USB)
 LUFA_PATH    = ../../LUFA
 CC_FLAGS     = -DUSE_LUFA_CONFIG_HEADER -IConfig/
 LD_FLAGS     =
 
 # Default target
 all:
+
+minimus_hack.o: minimus_rom.h
+
+minimus_rom.h: minimus.rom build_rom.py
+	./build_rom.py
+
+clean: cleanrom
+
+cleanrom:
+	rm -f minimus_rom.h
+
+.phony: cleanrom
 
 # Include LUFA build script makefiles
 include $(LUFA_PATH)/Build/lufa_core.mk
