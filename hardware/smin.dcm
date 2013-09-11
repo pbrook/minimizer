@@ -1,0 +1,7 @@
+EESchema-DOCLIB  Version 2.0  Date: Tue 10 Sep 2013 13:22:52 BST
+#
+$CMP AT45DB
+D ATMEL DataFlash
+$ENDCMP
+#
+#End Doc Library
