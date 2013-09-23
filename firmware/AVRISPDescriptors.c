@@ -80,7 +80,11 @@ const USB_Descriptor_Device_t PROGMEM AVRISP_DeviceDescriptor =
  *  and endpoints. The descriptor is read out by the USB host during the enumeration process when selecting
  *  a configuration so that the host may correctly communicate with the USB device.
  */
+#if defined(RESET_TOGGLES_LIBUSB_COMPAT)
 AVRISP_USB_Descriptor_Configuration_t AVRISP_ConfigurationDescriptor =
+#else
+const PROGMEM AVRISP_USB_Descriptor_Configuration_t AVRISP_ConfigurationDescriptor =
+#endif
 {
 	.Config =
 		{
@@ -207,8 +211,8 @@ uint16_t AVRISP_GetDescriptor(const uint16_t wValue,
 			Size    = sizeof(USB_Descriptor_Device_t);
 			break;
 		case DTYPE_Configuration:
-			*DescriptorMemorySpace = MEMSPACE_RAM;
 			#if defined(RESET_TOGGLES_LIBUSB_COMPAT)
+			*DescriptorMemorySpace = MEMSPACE_RAM;
 				/* Update the configuration descriptor with the current endpoint address */
 				AVRISP_ConfigurationDescriptor.AVRISP_DataInEndpoint.EndpointAddress = AVRISP_CurrDataINEndpointAddress;
 			#endif
