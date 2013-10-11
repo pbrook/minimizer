@@ -51,6 +51,7 @@
 		#endif
 
 		#include "AVRISPDescriptors.h"
+		#include "MSDescriptors.h"
 		#include "Lib/V2Protocol.h"
 		#include "Config/AppConfig.h"
 

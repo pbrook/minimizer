@@ -18,13 +18,15 @@ F_CPU        = 16000000
 F_USB        = $(F_CPU)
 OPTIMIZATION = s
 TARGET       = AVRISP-MKII
-SRC          = $(TARGET).c minimus_hack.c AVRISPDescriptors.c \
+SRC          = $(TARGET).c minimus_hack.c AVRISPDescriptors.c MSDescriptors.c \
 	       Lib/V2Protocol.c Lib/V2ProtocolParams.c Lib/ISP/ISPProtocol.c Lib/ISP/ISPTarget.c \
 	       Lib/XPROG/XPROGProtocol.c Lib/XPROG/XPROGTarget.c \
 	       Lib/XPROG/XMEGANVM.c Lib/XPROG/TINYNVM.c \
-	       $(LUFA_SRC_USB)
+	       Lib/SCSI.c Lib/DataflashManager.c \
+	       Lib/fatfs/diskio.c Lib/fatfs/ff.c \
+	       $(LUFA_SRC_USB) $(LUFA_SRC_USBCLASS)
 LUFA_PATH    = ../../LUFA
-CC_FLAGS     = -DUSE_LUFA_CONFIG_HEADER -IConfig/
+CC_FLAGS     = -DUSE_LUFA_CONFIG_HEADER -IConfig/ -ILib/fatfs
 LD_FLAGS     =
 
 # Default target

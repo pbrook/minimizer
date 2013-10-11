@@ -1,6 +1,6 @@
 #include "AVRISP-MKII.h"
-#include <LUFA/Drivers/Peripheral/Serial.h>
 #include <LUFA/Drivers/Board/Buttons.h>
+#include <ff.h>
 
 #include "minimus_rom.h"
 
@@ -24,17 +24,6 @@ LogByte(const uint8_t Byte)
   count = AUDIO_SCALE;
 }
 
-void foo(uint16_t val)
-{
-  int i;
-  static const char hex_chars[] = "0123456789abcdef";
-  for (i = 0; i < 4; i++) {
-    Serial_SendByte(hex_chars[val >> 12]);
-    val <<= 4;
-  }
-  Serial_SendByte('\n');
-}
-
 static uint8_t
 do_cmd(const uint32_t cmd)
 {
@@ -56,25 +45,22 @@ enum fuse_id {
     FUSE_HIGH,
     FUSE_EXT
 };
+
 static void
 mm_SetFuse(enum fuse_id id, uint8_t val)
 {
   uint8_t old;
   uint32_t read_cmd = 0;
   uint32_t write_cmd = 0;
-  switch (id) {
-    case FUSE_LOW:
+  if (id == FUSE_LOW) {
       read_cmd = 0x5000;
       write_cmd = 0xaca0;
-      break;
-    case FUSE_HIGH:
+  } else if (id == FUSE_HIGH) {
       read_cmd = 0x5808;
       write_cmd = 0xaca8;
-      break;
-    case FUSE_EXT:
+  } else if (id == FUSE_EXT) {
       read_cmd = 0x5008;
       write_cmd = 0xaca4;
-      break;
   }
   read_cmd <<= 16;
   write_cmd <<= 16;
@@ -124,6 +110,8 @@ mm_StartISP(void)
   return id != 0x53;
 }
 
+FIL fh;
+
 static bool
 mm_VerifyID(void)
 {
@@ -132,6 +120,8 @@ mm_VerifyID(void)
   id = 0;
   for (i = 0; i < 3; i++)
     id = (id << 8) | do_cmd(0x30000000 | (i << 8));
+
+  f_open(&fh, "minizer.cfg", FA_OPEN_EXISTING | FA_READ);
   return (id != 0x1e958aul);
 }
 
@@ -166,6 +156,14 @@ mm_button(void)
   return (Buttons_GetStatus() & BUTTONS_BUTTON1) != 0;
 }
 
+FATFS fatfs;
+
+static void
+mm_InitFS(void)
+{
+  f_mount(0, &fatfs);
+}
+
 bool
 program_minimus(void)
 {
@@ -176,7 +174,6 @@ program_minimus(void)
       Buttons_Init();
       DDRB |= BEEP_MASK;
       PORTB |= BEEP_MASK;
-      //Serial_Init(9600, false);
       done_init = true;
   }
 
@@ -185,6 +182,7 @@ program_minimus(void)
 
   if (!mm_button())
     return false;
+
   for (i = 0; i < 10; i++) {
       if (!mm_button())
 	return true;
@@ -198,6 +196,8 @@ program_minimus(void)
   LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED2);
   while (mm_button())
     Delay_MS(1);
+
+  mm_InitFS();
 
   if (mm_StartISP())
     goto fail;

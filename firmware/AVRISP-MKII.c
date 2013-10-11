@@ -35,6 +35,23 @@
  */
 
 #include "AVRISP-MKII.h"
+#include "Lib/SCSI.h"
+#include <LUFA/Drivers/Board/Dataflash.h>
+
+#define DIP2_BIT (1 << 5)
+#define DIP2_PORT PORTC
+#define DIP2_PIN PINC
+#define DIP2_DDR DDRC
+
+#if defined(ENABLE_STORAGE)
+#define STORAGE_BIT DIP2_BIT
+#define STORAGE_PORT DIP2_PORT
+#define STORAGE_PIN DIP2_PIN
+#define STORAGE_DDR DIP2_DDR
+bool storage_mode = false;
+#else
+#define storage_mode false
+#endif
 
 static uint8_t current_leds;
 
@@ -50,6 +67,33 @@ set_leds(uint8_t mask)
   current_leds = mask;
   restore_leds();
 }
+
+#if defined(ENABLE_STORAGE)
+/** LUFA Mass Storage Class driver interface configuration and state information. This structure is
+ *  passed to all Mass Storage Class driver functions, so that multiple instances of the same class
+ *  within a device can be differentiated from one another.
+ */
+USB_ClassInfo_MS_Device_t Disk_MS_Interface =
+	{
+		.Config =
+			{
+				.InterfaceNumber                = 2,
+				.DataINEndpoint                 =
+					{
+						.Address                = MASS_STORAGE_IN_EPADDR,
+						.Size                   = MASS_STORAGE_IO_EPSIZE,
+						.Banks                  = 1,
+					},
+				.DataOUTEndpoint                =
+					{
+						.Address                = MASS_STORAGE_OUT_EPADDR,
+						.Size                   = MASS_STORAGE_IO_EPSIZE,
+						.Banks                  = 1,
+					},
+				.TotalLUNs                 = 1,
+			},
+	};
+#endif
 
 /** Main program entry point. This routine contains the overall program flow, including initial
  *  setup of all components and the main program loop.
@@ -70,9 +114,14 @@ int main(void)
 		LEDs_ChangeLEDs(LEDMASK_VBUSPOWER, (PIND & (1 << 0)) ? 0 : LEDMASK_VBUSPOWER);
 		#endif
 
-		AVRISP_Task();
+#if defined(ENABLE_STORAGE)
+		if (storage_mode)
+		    MS_Device_USBTask(&Disk_MS_Interface);
+		else
+#endif
+		    AVRISP_Task();
 		USB_USBTask();
-		if (program_minimus())
+		if (!storage_mode && program_minimus())
 		  restore_leds();
 	}
 }
@@ -89,11 +138,17 @@ void SetupHardware(void)
 	clock_prescale_set(clock_div_1);
 #endif
 
+	STORAGE_DDR &= STORAGE_BIT;
+	STORAGE_PORT |= STORAGE_BIT;
+
 	/* Hardware Initialization */
 	LEDs_Init();
+	if ((STORAGE_PIN & STORAGE_BIT) == 0)
+	  storage_mode = true;
 	#if defined(RESET_TOGGLES_LIBUSB_COMPAT)
 	UpdateCurrentCompatibilityMode();
 	#endif
+	Dataflash_Init();
 
 	/* USB Stack Initialization */
 	USB_Init();
@@ -112,7 +167,7 @@ void EVENT_USB_Device_Disconnect(void)
 }
 
 /** Event handler for the library USB Configuration Changed event. */
-void EVENT_USB_Device_ConfigurationChanged(void)
+static bool AVRISP_USB_Device_ConfigurationChanged(void)
 {
 	bool ConfigSuccess = true;
 
@@ -123,9 +178,42 @@ void EVENT_USB_Device_ConfigurationChanged(void)
 	if ((AVRISP_DATA_IN_EPADDR & ENDPOINT_EPNUM_MASK) != (AVRISP_DATA_OUT_EPADDR & ENDPOINT_EPNUM_MASK))
 	  ConfigSuccess &= Endpoint_ConfigureEndpoint(AVRISP_DATA_IN_EPADDR, EP_TYPE_BULK, AVRISP_DATA_EPSIZE, 1);
 
+	return ConfigSuccess;
+}
+
+#if defined(ENABLE_STORAGE)
+static bool MS_USB_Device_ConfigurationChanged(void)
+{
+	bool ConfigSuccess = true;
+
+	ConfigSuccess &= MS_Device_ConfigureEndpoints(&Disk_MS_Interface);
+
+	return ConfigSuccess;
+}
+#endif
+
+void EVENT_USB_Device_ConfigurationChanged(void)
+{
+	bool ConfigSuccess;
+#if defined(ENABLE_STORAGE)
+	if (storage_mode)
+	    ConfigSuccess = MS_USB_Device_ConfigurationChanged();
+	else
+#endif
+	    ConfigSuccess = AVRISP_USB_Device_ConfigurationChanged();
+
 	/* Indicate endpoint configuration success or failure */
 	set_leds(ConfigSuccess ? LEDMASK_USB_READY : LEDMASK_USB_ERROR);
 }
+
+#if defined(ENABLE_STORAGE)
+/** Event handler for the library USB Control Request reception event. */
+void EVENT_USB_Device_ControlRequest(void)
+{
+    if (storage_mode)
+	MS_Device_ProcessControlRequest(&Disk_MS_Interface);
+}
+#endif
 
 /** Processes incoming V2 Protocol commands from the host, returning a response when required. */
 void AVRISP_Task(void)
@@ -168,6 +256,26 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
                                     const void** const DescriptorAddress,
                                     uint8_t* DescriptorMemorySpace)
 {
+#if defined(ENABLE_STORAGE)
+    if (storage_mode)
+	return MS_GetDescriptor(wValue, wIndex, DescriptorAddress, DescriptorMemorySpace);
+    else
+#endif
 	return AVRISP_GetDescriptor(wValue, wIndex, DescriptorAddress, DescriptorMemorySpace);
+}
+
+/** Mass Storage class driver callback function the reception of SCSI commands from the host, which must be processed.
+ *
+ *  \param[in] MSInterfaceInfo  Pointer to the Mass Storage class interface configuration structure being referenced
+ */
+bool CALLBACK_MS_Device_SCSICommandReceived(USB_ClassInfo_MS_Device_t* const MSInterfaceInfo)
+{
+	bool CommandSuccess;
+
+	set_leds(LEDMASK_BUSY);
+	CommandSuccess = SCSI_DecodeSCSICommand(MSInterfaceInfo);
+	set_leds(LEDMASK_USB_READY);
+
+	return CommandSuccess;
 }
 
