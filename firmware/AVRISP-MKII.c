@@ -38,16 +38,7 @@
 #include "Lib/SCSI.h"
 #include <LUFA/Drivers/Board/Dataflash.h>
 
-#define DIP2_BIT (1 << 5)
-#define DIP2_PORT PORTC
-#define DIP2_PIN PINC
-#define DIP2_DDR DDRC
-
-#if defined(ENABLE_STORAGE)
-#define STORAGE_BIT DIP2_BIT
-#define STORAGE_PORT DIP2_PORT
-#define STORAGE_PIN DIP2_PIN
-#define STORAGE_DDR DIP2_DDR
+#if defined(MINIMIZER)
 bool storage_mode = false;
 #else
 #define storage_mode false
@@ -68,7 +59,7 @@ set_leds(uint8_t mask)
   restore_leds();
 }
 
-#if defined(ENABLE_STORAGE)
+#if defined(MINIMIZER)
 /** LUFA Mass Storage Class driver interface configuration and state information. This structure is
  *  passed to all Mass Storage Class driver functions, so that multiple instances of the same class
  *  within a device can be differentiated from one another.
@@ -114,17 +105,23 @@ int main(void)
 		LEDs_ChangeLEDs(LEDMASK_VBUSPOWER, (PIND & (1 << 0)) ? 0 : LEDMASK_VBUSPOWER);
 		#endif
 
-#if defined(ENABLE_STORAGE)
+#if defined(MINIMIZER)
 		if (storage_mode)
 		    MS_Device_USBTask(&Disk_MS_Interface);
 		else
 #endif
 		    AVRISP_Task();
 		USB_USBTask();
+#ifdef MINIMIZER
 		if (!storage_mode && program_minimus())
 		  restore_leds();
+#endif
 	}
 }
+
+#ifndef MINIMIZER
+static uint8_t RealISPPageBuffer[256];
+#endif
 
 /** Configures the board hardware and chip peripherals for the demo's functionality. */
 void SetupHardware(void)
@@ -138,12 +135,15 @@ void SetupHardware(void)
 	clock_prescale_set(clock_div_1);
 #endif
 
-	STORAGE_DDR &= STORAGE_BIT;
-	STORAGE_PORT |= STORAGE_BIT;
+#ifdef MINIMIZER
+	minimizer_init();
+#else
+	ISPPageBuffer = RealISPPageBuffer;
+#endif
 
 	/* Hardware Initialization */
 	LEDs_Init();
-	if ((STORAGE_PIN & STORAGE_BIT) == 0)
+	if ((DIP_MSD_PIN & DIP_MSD_MASK) == 0)
 	  storage_mode = true;
 	#if defined(RESET_TOGGLES_LIBUSB_COMPAT)
 	UpdateCurrentCompatibilityMode();
@@ -181,7 +181,7 @@ static bool AVRISP_USB_Device_ConfigurationChanged(void)
 	return ConfigSuccess;
 }
 
-#if defined(ENABLE_STORAGE)
+#if defined(MINIMIZER)
 static bool MS_USB_Device_ConfigurationChanged(void)
 {
 	bool ConfigSuccess = true;
@@ -195,7 +195,7 @@ static bool MS_USB_Device_ConfigurationChanged(void)
 void EVENT_USB_Device_ConfigurationChanged(void)
 {
 	bool ConfigSuccess;
-#if defined(ENABLE_STORAGE)
+#if defined(MINIMIZER)
 	if (storage_mode)
 	    ConfigSuccess = MS_USB_Device_ConfigurationChanged();
 	else
@@ -206,7 +206,7 @@ void EVENT_USB_Device_ConfigurationChanged(void)
 	set_leds(ConfigSuccess ? LEDMASK_USB_READY : LEDMASK_USB_ERROR);
 }
 
-#if defined(ENABLE_STORAGE)
+#if defined(MINIMIZER)
 /** Event handler for the library USB Control Request reception event. */
 void EVENT_USB_Device_ControlRequest(void)
 {
@@ -256,7 +256,7 @@ uint16_t CALLBACK_USB_GetDescriptor(const uint16_t wValue,
                                     const void** const DescriptorAddress,
                                     uint8_t* DescriptorMemorySpace)
 {
-#if defined(ENABLE_STORAGE)
+#if defined(MINIMIZER)
     if (storage_mode)
 	return MS_GetDescriptor(wValue, wIndex, DescriptorAddress, DescriptorMemorySpace);
     else

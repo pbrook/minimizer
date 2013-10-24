@@ -229,6 +229,7 @@ int f_putc (TCHAR, FIL*);							/* Put a character to the file */
 int f_puts (const TCHAR*, FIL*);					/* Put a string to the file */
 int f_printf (FIL*, const TCHAR*, ...);				/* Put a formatted string to the file */
 TCHAR* f_gets (TCHAR*, int, FIL*);					/* Get a string from the file */
+void *f_getbuffer(FATFS *fs); /* Get temporary buffer.  */
 
 #define f_eof(fp) (((fp)->fptr == (fp)->fsize) ? 1 : 0)
 #define f_error(fp) (((fp)->flag & FA__ERROR) ? 1 : 0)

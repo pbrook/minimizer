@@ -18,7 +18,7 @@ F_CPU        = 16000000
 F_USB        = $(F_CPU)
 OPTIMIZATION = s
 TARGET       = AVRISP-MKII
-SRC          = $(TARGET).c minimus_hack.c AVRISPDescriptors.c MSDescriptors.c \
+SRC          = $(TARGET).c minimizer.c AVRISPDescriptors.c MSDescriptors.c \
 	       Lib/V2Protocol.c Lib/V2ProtocolParams.c Lib/ISP/ISPProtocol.c Lib/ISP/ISPTarget.c \
 	       Lib/XPROG/XPROGProtocol.c Lib/XPROG/XPROGTarget.c \
 	       Lib/XPROG/XMEGANVM.c Lib/XPROG/TINYNVM.c \
@@ -32,7 +32,7 @@ LD_FLAGS     =
 # Default target
 all:
 
-minimus_hack.o: minimus_rom.h
+minimizer.o: minimus_rom.h
 
 minimus_rom.h: minimus.rom build_rom.py
 	./build_rom.py

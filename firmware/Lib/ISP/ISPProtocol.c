@@ -37,6 +37,8 @@
 
 #if defined(ENABLE_ISP_PROTOCOL) || defined(__DOXYGEN__)
 
+uint8_t *ISPPageBuffer;
+
 bool ISPActive;
 
 /** Handler for the CMD_ENTER_PROGMODE_ISP command, which attempts to enter programming mode on
@@ -150,14 +152,12 @@ void ISPProtocol_ProgramMemory(uint8_t V2Command)
 		uint8_t  ProgrammingCommands[3];
 		uint8_t  PollValue1;
 		uint8_t  PollValue2;
-		uint8_t  ProgData[256]; // Note, the Jungo driver has a very short ACK timeout period, need to buffer the
 	} Write_Memory_Params;      // whole page and ACK the packet as fast as possible to prevent it from aborting
 
-	Endpoint_Read_Stream_LE(&Write_Memory_Params, (sizeof(Write_Memory_Params) -
-	                                               sizeof(Write_Memory_Params.ProgData)), NULL);
+	Endpoint_Read_Stream_LE(&Write_Memory_Params, sizeof(Write_Memory_Params), NULL);
 	Write_Memory_Params.BytesToWrite = SwapEndian_16(Write_Memory_Params.BytesToWrite);
 
-	if (Write_Memory_Params.BytesToWrite > sizeof(Write_Memory_Params.ProgData))
+	if (Write_Memory_Params.BytesToWrite > 256)
 	{
 		Endpoint_ClearOUT();
 		Endpoint_SelectEndpoint(AVRISP_DATA_IN_EPADDR);
@@ -169,11 +169,11 @@ void ISPProtocol_ProgramMemory(uint8_t V2Command)
 		return;
 	}
 
-	Endpoint_Read_Stream_LE(&Write_Memory_Params.ProgData, Write_Memory_Params.BytesToWrite, NULL);
+	Endpoint_Read_Stream_LE(ISPPageBuffer, Write_Memory_Params.BytesToWrite, NULL);
 
 	// The driver will terminate transfers that are a round multiple of the endpoint bank in size with a ZLP, need
 	// to catch this and discard it before continuing on with packet processing to prevent communication issues
-	if (((sizeof(uint8_t) + sizeof(Write_Memory_Params) - sizeof(Write_Memory_Params.ProgData)) +
+	if (((sizeof(uint8_t) + sizeof(Write_Memory_Params)) +
 	    Write_Memory_Params.BytesToWrite) % AVRISP_DATA_EPSIZE == 0)
 	{
 		Endpoint_ClearOUT();
@@ -188,7 +188,7 @@ void ISPProtocol_ProgramMemory(uint8_t V2Command)
 	uint8_t  PollValue         = (V2Command == CMD_PROGRAM_FLASH_ISP) ? Write_Memory_Params.PollValue1 :
 	                                                                    Write_Memory_Params.PollValue2;
 	uint16_t PollAddress       = 0;
-	uint8_t* NextWriteByte     = Write_Memory_Params.ProgData;
+	uint8_t* NextWriteByte     = ISPPageBuffer;
 	uint16_t PageStartAddress  = (CurrentAddress & 0xFFFF);
 
 	for (uint16_t CurrentByte = 0; CurrentByte < Write_Memory_Params.BytesToWrite; CurrentByte++)
@@ -462,11 +462,10 @@ void ISPProtocol_SPIMulti(void)
 		uint8_t TxBytes;
 		uint8_t RxBytes;
 		uint8_t RxStartAddr;
-		uint8_t TxData[255];
 	} SPI_Multi_Params;
 
-	Endpoint_Read_Stream_LE(&SPI_Multi_Params, (sizeof(SPI_Multi_Params) - sizeof(SPI_Multi_Params.TxData)), NULL);
-	Endpoint_Read_Stream_LE(&SPI_Multi_Params.TxData, SPI_Multi_Params.TxBytes, NULL);
+	Endpoint_Read_Stream_LE(&SPI_Multi_Params, sizeof(SPI_Multi_Params), NULL);
+	Endpoint_Read_Stream_LE(ISPPageBuffer, SPI_Multi_Params.TxBytes, NULL);
 
 	Endpoint_ClearOUT();
 	Endpoint_SelectEndpoint(AVRISP_DATA_IN_EPADDR);
@@ -482,7 +481,7 @@ void ISPProtocol_SPIMulti(void)
 	while (CurrTxPos < SPI_Multi_Params.RxStartAddr)
 	{
 		if (CurrTxPos < SPI_Multi_Params.TxBytes)
-		  ISPTarget_SendByte(SPI_Multi_Params.TxData[CurrTxPos]);
+		  ISPTarget_SendByte(ISPPageBuffer[CurrTxPos]);
 		else
 		  ISPTarget_SendByte(0);
 
@@ -493,7 +492,7 @@ void ISPProtocol_SPIMulti(void)
 	while (CurrRxPos < SPI_Multi_Params.RxBytes)
 	{
 		if (CurrTxPos < SPI_Multi_Params.TxBytes)
-		  Endpoint_Write_8(ISPTarget_TransferByte(SPI_Multi_Params.TxData[CurrTxPos++]));
+		  Endpoint_Write_8(ISPTarget_TransferByte(ISPPageBuffer[CurrTxPos++]));
 		else
 		  Endpoint_Write_8(ISPTarget_ReceiveByte());
 

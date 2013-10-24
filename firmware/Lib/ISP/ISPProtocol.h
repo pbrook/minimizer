@@ -79,5 +79,7 @@
 		void ISPProtocol_WriteFuseLock(const uint8_t V2Command);
 		void ISPProtocol_SPIMulti(void);
 		void ISPProtocol_DelayMS(uint8_t DelayMS);
+
+		extern uint8_t *ISPPageBuffer;
 #endif
 

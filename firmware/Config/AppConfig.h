@@ -53,7 +53,7 @@
 	#endif
 
 	#define ENABLE_ISP_PROTOCOL
-	#define ENABLE_XPROG_PROTOCOL
+//	#define ENABLE_XPROG_PROTOCOL
 
 	#define VTARGET_ADC_CHANNEL        2
 	#define VTARGET_REF_VOLTS          5
@@ -67,5 +67,5 @@
 //	#define RESET_TOGGLES_LIBUSB_COMPAT
 //	#define FIRMWARE_VERSION_MINOR     0x11
 
-	#define ENABLE_STORAGE
+	#define MINIMIZER 1
 #endif

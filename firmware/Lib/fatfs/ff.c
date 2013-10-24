@@ -4137,3 +4137,12 @@ int f_printf (
 
 #endif /* !_FS_READONLY */
 #endif /* _USE_STRFUNC */
+
+/* Invalidate sector buffer and return its address.
+   The buffer may be used for other purposes until the next f_* call*/
+void *f_getbuffer(FATFS *fs)
+{
+  move_window(fs, 0);
+  fs->winsect = 0;
+  return fs->win;
+}
