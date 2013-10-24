@@ -275,9 +275,11 @@ void ISPTarget_ChangeTargetResetLine(const bool ResetTarget)
 		  AUX_LINE_PORT |=  AUX_LINE_MASK;
 		else
 		  AUX_LINE_PORT &= ~AUX_LINE_MASK;
+		minimizer_set_power(true);
 	}
 	else
 	{
+		minimizer_set_power(false);
 		AUX_LINE_DDR  &= ~AUX_LINE_MASK;
 		AUX_LINE_PORT &= ~AUX_LINE_MASK;
 	}

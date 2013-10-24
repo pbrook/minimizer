@@ -16,12 +16,40 @@ LogByte(const uint8_t Byte)
       count--;
       return;
   }
+  if ((DIP_SILENT_PIN & DIP_SILENT_MASK) == 0)
+    return;
   if (Byte & 1)
       PORTB |= BEEP_MASK;
   else
       PORTB &= ~(BEEP_MASK);
   count = AUDIO_SCALE;
 }
+
+static void
+blink(uint8_t led)
+{
+  int i;
+  for (i = 0; i < 5; i++) {
+      LEDs_SetAllLEDs(led);
+      Delay_MS(100);
+      LEDs_SetAllLEDs(0);
+      Delay_MS(100);
+  }
+}
+
+#if 0
+WCHAR ff_convert (WCHAR c, UINT i)
+{
+  return c;
+}
+
+WCHAR ff_wtoupper (WCHAR c)
+{
+  if (c >= 'a' && c <= 'z')
+    return c + 'A' - 'a';
+  return c;
+}
+#endif
 
 static uint8_t
 do_cmd(const uint32_t cmd)
@@ -77,33 +105,46 @@ mm_EraseChip(void)
   Delay_MS(10);
 }
 
-static bool
-dip_power_enabled(void)
+bool isp_power;
+
+static void update_power(void)
 {
-  return ((DIP_POWER_PIN & DIP_POWER_MASK) == 0);
+  bool override = (DIP_POWER_PIN & DIP_POWER_MASK) == 0;
+
+  if (isp_power || override)
+    POWER_PORT &= ~POWER_MASK;
+  else
+    POWER_PORT |= POWER_MASK;
+}
+
+void
+minimizer_set_power(bool on)
+{
+  isp_power = on;
+  update_power();
 }
 
 /* Release target from reset.  */
 static void
 mm_Release(void)
 {
-  AUX_LINE_DDR &= AUX_LINE_MASK;
-  AUX_LINE_PORT &= AUX_LINE_MASK;
+  AUX_LINE_DDR &= ~AUX_LINE_MASK;
+  AUX_LINE_PORT &= ~AUX_LINE_MASK;
 
-  if (!dip_power_enabled())
-    POWER_PORT |= POWER_MASK;
+  isp_power = false;
+  update_power();
 }
 
 /* Reset target ready for programming.  */
 static void
 mm_Reset(void)
 {
-  SPI_Init(SPI_SPEED_FCPU_DIV_32 | SPI_ORDER_MSB_FIRST | SPI_SCK_LEAD_RISING | SPI_SAMPLE_LEADING | SPI_MODE_MASTER);
+  SPI_Init(SPI_SPEED_FCPU_DIV_128 | SPI_ORDER_MSB_FIRST | SPI_SCK_LEAD_RISING | SPI_SAMPLE_LEADING | SPI_MODE_MASTER);
   AUX_LINE_DDR |= AUX_LINE_MASK;
   AUX_LINE_PORT &= ~AUX_LINE_MASK;
 
-  if (!dip_power_enabled())
-    POWER_PORT &= ~POWER_MASK;
+  isp_power = true;
+  update_power();
 }
 
 static bool
@@ -139,14 +180,14 @@ strcmp_p(const char *a, PGM_P b)
 
 FIL fh;
 
-static char config_filename[13];
+static char config_filename[_MAX_LFN + 1];
 static uint8_t config_fuse[4];
 static uint8_t seen_fuse;
 static uint32_t config_page_mask;
 
 #define VAR_NAME_MAX_LEN 4
 static char var_name[VAR_NAME_MAX_LEN + 1];
-static char var_value[13];
+static char var_value[_MAX_LFN + 1];
 
 /* Return false on error.  */
 static bool
@@ -159,6 +200,7 @@ parse_line(void)
   var_value[0] = 0;
   p = var_name;
   len = VAR_NAME_MAX_LEN;
+
   while (true) {
       f_read(&fh, p, 1, &count);
       if (count == 0)
@@ -166,7 +208,7 @@ parse_line(void)
       if (*p == '=') {
 	  *p = 0;
 	  p = var_value;
-	  len = 12;
+	  len = _MAX_LFN;
       } else if (*p == ' ' || *p == '\r' || *p == '\t') {
 	  /* Ignore character.  */
       } else if (*p == '\n') {
@@ -239,13 +281,16 @@ mm_VerifyID(void)
       else
 	config_filename[i] = val + '0';
   }
+  if (id == 0 || id == 0x1e9206)
+    blink(LEDS_LED1);
   config_filename[6] = '.';
   config_filename[7] = 'c';
   config_filename[8] = 'f';
   config_filename[9] = 'g';
+  config_filename[10] = 0;
   rc = f_open(&fh, config_filename, FA_OPEN_EXISTING | FA_READ);
   if (rc != FR_OK)
-    return true;
+    return false;
 
   seen_fuse = 0;
   config_filename[0] = 0;
@@ -485,8 +530,10 @@ mm_ProgramFlash(void)
 {
   if (!flash_hex(false))
     return false;
+#if 0
   if (!flash_hex(true))
     return false;
+#endif
   return true;
 }
 
@@ -507,10 +554,7 @@ void minimizer_init(void)
   PORTC |= DIP_PORTC_MASK;
 
   POWER_DDR |= POWER_MASK;
-  if (dip_power_enabled())
-    POWER_PORT &= ~POWER_MASK;
-  else
-    POWER_PORT |= POWER_MASK;
+  update_power();
 
   Buttons_Init();
 
@@ -528,16 +572,19 @@ program_minimus(void)
 {
   int i;
 
+  update_power();
+
   if (ISPActive) {
-      /* Make sure buzzer is idle low.  */
-      PORTB &= ~BEEP_MASK;
       return false;
   }
+
+  /* Make sure buzzer is idle low.  */
+  PORTB &= ~BEEP_MASK;
 
   if (!mm_button())
     return false;
 
-  for (i = 0; i < 10; i++) {
+  for (i = 0; i < 5; i++) {
       if (!mm_button())
 	return true;
       LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED2);
@@ -555,24 +602,24 @@ program_minimus(void)
     goto fail;
   if (!mm_VerifyID())
     goto fail;
+  blink(LEDS_LED1);
   mm_EraseChip();
   if (mm_StartISP())
     goto fail;
-  mm_ProgramFlash();
+  if (!mm_ProgramFlash())
+    goto fail;
   for (i = 0; i < 4; i++) {
       if (seen_fuse & (1 << i)) {
 	  mm_SetFuse(i, config_fuse[i]);
       }
   }
   mm_Release();
-  LEDs_SetAllLEDs(LEDS_LED2);
-  Delay_MS(1000);
+  blink(LEDS_LED1);
   ISPPageBuffer = f_getbuffer(&fatfs);
   return true;
 fail:
   mm_Release();
-  LEDs_SetAllLEDs(LEDS_LED1);
-  Delay_MS(1000);
+  blink(LEDS_LED2);
   ISPPageBuffer = f_getbuffer(&fatfs);
   return true;
 }

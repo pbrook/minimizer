@@ -1,14 +1,18 @@
 #ifndef MINIMIZER_H
 #define MINIMIZER_H
 
-/* DIP switch mappings:
+/* Pin mappings:
   Button PC4
   DIP1 (hardwired power)
   DIP2 PC5
-  DIP3 Reset(!)
+  DIP3 PD4
   DIP4 PC7
   DIP5 PB6
   DIP6 PB5
+  DIP7 (hardwired mega328)
+  DIP8 (hardwired tiny2313)
+  LED PB0
+  Power enable PC2
 */
 
 #ifndef BOARD_MINIMUS
@@ -38,5 +42,6 @@
 #define POWER_DDR DDRC
 
 void minimizer_init(void);
+void minimizer_set_power(bool on);
 
 #endif

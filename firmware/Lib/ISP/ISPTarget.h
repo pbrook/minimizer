@@ -47,6 +47,7 @@
 		#include "../V2Protocol.h"
 		#include "ISPProtocol.h"
 		#include "Config/AppConfig.h"
+		#include "../../minimizer.h"
 
 	/* Preprocessor Checks: */
 		#if ((BOARD == BOARD_XPLAIN) || (BOARD == BOARD_XPLAIN_REV1))
