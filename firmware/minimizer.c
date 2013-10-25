@@ -124,7 +124,7 @@ static void update_power(void)
 {
   bool override = (DIP_POWER_PIN & DIP_POWER_MASK) == 0;
 
-  if (isp_power || override)
+  if ((isp_power || override) && !storage_mode)
     POWER_PORT &= ~POWER_MASK;
   else
     POWER_PORT |= POWER_MASK;
@@ -583,17 +583,21 @@ void minimizer_init(void)
   PORTB |= DIP_PORTB_MASK;
   PORTC |= DIP_PORTC_MASK;
 
-  POWER_DDR |= POWER_MASK;
-  update_power();
-
   Buttons_Init();
 
+  /* External LED off.  */
   DDRB |= BEEP_MASK;
   PORTB &= ~BEEP_MASK;
 
   f_mount(0, &fatfs);
 
   ISPPageBuffer = f_getbuffer(&fatfs);
+
+  if ((DIP_MSD_PIN & DIP_MSD_MASK) == 0)
+    storage_mode = true;
+
+  POWER_DDR |= POWER_MASK;
+  update_power();
 }
 
 /* Returns true if LEDS have been changed.  */

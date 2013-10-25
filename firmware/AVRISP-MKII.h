@@ -92,6 +92,7 @@
 		                                    uint8_t* const DescriptorMemorySpace)
 		                                    ATTR_WARN_UNUSED_RESULT ATTR_NON_NULL_PTR_ARG(3) ATTR_NON_NULL_PTR_ARG(4);
 
+extern bool storage_mode;
 bool program_minimus(void);
 #endif
 

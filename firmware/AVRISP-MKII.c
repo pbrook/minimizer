@@ -143,8 +143,6 @@ void SetupHardware(void)
 
 	/* Hardware Initialization */
 	LEDs_Init();
-	if ((DIP_MSD_PIN & DIP_MSD_MASK) == 0)
-	  storage_mode = true;
 	#if defined(RESET_TOGGLES_LIBUSB_COMPAT)
 	UpdateCurrentCompatibilityMode();
 	#endif
