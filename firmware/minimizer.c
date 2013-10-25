@@ -487,6 +487,9 @@ flash_hex(bool verify)
 	  if (i < 0)
 	    goto fail;
 	  addr_high |= (uint32_t)i << 16;
+      } else if (data[8] == '3') { // Start address (ignored)
+	  if (!safe_read(data, 8))
+	    goto fail;
       } else if (data[8] == '0') { // Data
 	  addr += addr_high;
 	  if (first) {
