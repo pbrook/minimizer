@@ -847,9 +847,9 @@ DWORD get_fat (	/* 0xFFFFFFFF:Disk error, 1:Internal error, Else:Cluster status 
 	switch (fs->fs_type) {
 	case FS_FAT12 :
 		bc = (UINT)clst; bc += bc / 2;
-		if (move_window(fs, fs->fatbase + (bc / PSS(fs)))) break;
-		wc = FSWIN(fs)[bc % SS(fs)]; bc++;
-		if (move_window(fs, fs->fatbase + (bc / PSS(fs)))) break;
+		if (move_window(fs, S2PS(fs->fatbase) + (bc / PSS(fs)))) break;
+		wc = FSWIN(fs)[bc % PSS(fs)]; bc++;
+		if (move_window(fs, S2PS(fs->fatbase) + (bc / PSS(fs)))) break;
 		wc |= FSWIN(fs)[bc % PSS(fs)] << 8;
 		return (clst & 1) ? (wc >> 4) : (wc & 0xFFF);
 #if _FS_TINY < 2
