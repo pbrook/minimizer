@@ -80,7 +80,8 @@ enum fuse_id {
     FUSE_LOCK
 };
 
-static void
+/* Returns true if fuse was programmed successfully.  */
+static bool
 mm_SetFuse(enum fuse_id id, uint8_t val)
 {
   uint8_t old;
@@ -104,11 +105,11 @@ mm_SetFuse(enum fuse_id id, uint8_t val)
 
   old = do_cmd(read_cmd);
   if (old == val)
-    return;
+    return true;
   do_cmd(write_cmd | val);
-  do {
-      old = do_cmd(read_cmd);
-  } while (old != val);
+  Delay_MS(10);
+  old = do_cmd(read_cmd);
+  return (old == val);
 }
 
 static void
@@ -645,7 +646,8 @@ program_minimus(void)
     goto fail;
   for (i = 0; i < 4; i++) {
       if (seen_fuse & (1 << i)) {
-	  mm_SetFuse(i, config_fuse[i]);
+	  if (!mm_SetFuse(i, config_fuse[i]))
+	    goto fail;
       }
   }
   mm_Release();
