@@ -297,15 +297,15 @@ void DataflashManager_WriteBlocks_RAM(const uint32_t BlockAddress,
                                       uint16_t TotalBlocks,
                                       const uint8_t* BufferPtr)
 {
-	uint16_t CurrDFPage          = ((BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE) / DATAFLASH_PAGE_SIZE);
-	uint16_t CurrDFPageByte      = ((BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE) % DATAFLASH_PAGE_SIZE);
+	uint16_t CurrDFPage          = ((BlockAddress * VRAM_BLOCK_SIZE) / DATAFLASH_PAGE_SIZE);
+	uint16_t CurrDFPageByte      = ((BlockAddress * VRAM_BLOCK_SIZE) % DATAFLASH_PAGE_SIZE);
 	uint8_t  CurrDFPageByteDiv16 = (CurrDFPageByte >> 4);
 	bool     UsingSecondBuffer   = false;
 
 	/* Select the correct starting Dataflash IC for the block requested */
 	Dataflash_SelectChipFromPage(CurrDFPage);
 
-#if (DATAFLASH_PAGE_SIZE > VIRTUAL_MEMORY_BLOCK_SIZE)
+#if (DATAFLASH_PAGE_SIZE > VRAM_BLOCK_SIZE)
 	/* Copy selected dataflash's current page contents to the Dataflash buffer */
 	Dataflash_SendByte(DF_CMD_MAINMEMTOBUFF1);
 	Dataflash_SendAddressBytes(CurrDFPage, 0);
@@ -321,7 +321,7 @@ void DataflashManager_WriteBlocks_RAM(const uint32_t BlockAddress,
 		uint8_t BytesInBlockDiv16 = 0;
 
 		/* Write an endpoint packet sized data block to the Dataflash */
-		while (BytesInBlockDiv16 < (VIRTUAL_MEMORY_BLOCK_SIZE >> 4))
+		while (BytesInBlockDiv16 < (VRAM_BLOCK_SIZE >> 4))
 		{
 			/* Check if end of Dataflash page reached */
 			if (CurrDFPageByteDiv16 == (DATAFLASH_PAGE_SIZE >> 4))
@@ -342,9 +342,9 @@ void DataflashManager_WriteBlocks_RAM(const uint32_t BlockAddress,
 				/* Select the next Dataflash chip based on the new Dataflash page index */
 				Dataflash_SelectChipFromPage(CurrDFPage);
 
-#if (DATAFLASH_PAGE_SIZE > VIRTUAL_MEMORY_BLOCK_SIZE)
+#if (DATAFLASH_PAGE_SIZE > VRAM_BLOCK_SIZE)
 				/* If less than one Dataflash page remaining, copy over the existing page to preserve trailing data */
-				if ((TotalBlocks * (VIRTUAL_MEMORY_BLOCK_SIZE >> 4)) < (DATAFLASH_PAGE_SIZE >> 4))
+				if ((TotalBlocks * (VRAM_BLOCK_SIZE >> 4)) < (DATAFLASH_PAGE_SIZE >> 4))
 				{
 					/* Copy selected dataflash's current page contents to the Dataflash buffer */
 					Dataflash_WaitWhileBusy();
@@ -398,8 +398,8 @@ void DataflashManager_ReadBlocks_RAM(const uint32_t BlockAddress,
                                      uint16_t TotalBlocks,
                                      uint8_t* BufferPtr)
 {
-	uint16_t CurrDFPage          = ((BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE) / DATAFLASH_PAGE_SIZE);
-	uint16_t CurrDFPageByte      = ((BlockAddress * VIRTUAL_MEMORY_BLOCK_SIZE) % DATAFLASH_PAGE_SIZE);
+	uint16_t CurrDFPage          = ((BlockAddress * VRAM_BLOCK_SIZE) / DATAFLASH_PAGE_SIZE);
+	uint16_t CurrDFPageByte      = ((BlockAddress * VRAM_BLOCK_SIZE) % DATAFLASH_PAGE_SIZE);
 	uint8_t  CurrDFPageByteDiv16 = (CurrDFPageByte >> 4);
 
 	/* Select the correct starting Dataflash IC for the block requested */
@@ -418,7 +418,7 @@ void DataflashManager_ReadBlocks_RAM(const uint32_t BlockAddress,
 		uint8_t BytesInBlockDiv16 = 0;
 
 		/* Write an endpoint packet sized data block to the Dataflash */
-		while (BytesInBlockDiv16 < (VIRTUAL_MEMORY_BLOCK_SIZE >> 4))
+		while (BytesInBlockDiv16 < (VRAM_BLOCK_SIZE >> 4))
 		{
 			/* Check if end of Dataflash page reached */
 			if (CurrDFPageByteDiv16 == (DATAFLASH_PAGE_SIZE >> 4))

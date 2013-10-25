@@ -120,6 +120,18 @@
 #define	SS(fs)	512U			/* Fixed sector size */
 #endif
 
+#if _FS_TINY < 2
+#define PSS(fs_) SS(fs)
+#define FSWIN(fs) fs->win
+#define S2PS(x) (x)
+#else
+#define PSS(fs) 256U
+#define S2PS(x) ((x) << 1)
+#define FSWIN(fs) fs->partwin
+#if _MAX_SS != 512
+#error sector size myst be 512 for _FS_TINY == 2
+#endif
+#endif
 
 /* Reentrancy related */
 #if _FS_REENTRANT
@@ -743,7 +755,7 @@ FRESULT move_window (
 		}
 #endif
 		if (sector) {
-			if (disk_read(fs->drv, fs->win, sector, 1) != RES_OK)
+			if (disk_read(fs->drv, FSWIN(fs), sector, 1) != RES_OK)
 				return FR_DISK_ERR;
 			fs->winsect = sector;
 		}
@@ -824,7 +836,9 @@ DWORD get_fat (	/* 0xFFFFFFFF:Disk error, 1:Internal error, Else:Cluster status 
 )
 {
 	UINT wc, bc;
+#if _FS_TINY < 2
 	BYTE *p;
+#endif
 
 
 	if (clst < 2 || clst >= fs->n_fatent)	/* Check range */
@@ -833,12 +847,12 @@ DWORD get_fat (	/* 0xFFFFFFFF:Disk error, 1:Internal error, Else:Cluster status 
 	switch (fs->fs_type) {
 	case FS_FAT12 :
 		bc = (UINT)clst; bc += bc / 2;
-		if (move_window(fs, fs->fatbase + (bc / SS(fs)))) break;
-		wc = fs->win[bc % SS(fs)]; bc++;
-		if (move_window(fs, fs->fatbase + (bc / SS(fs)))) break;
-		wc |= fs->win[bc % SS(fs)] << 8;
+		if (move_window(fs, fs->fatbase + (bc / PSS(fs)))) break;
+		wc = FSWIN(fs)[bc % SS(fs)]; bc++;
+		if (move_window(fs, fs->fatbase + (bc / PSS(fs)))) break;
+		wc |= FSWIN(fs)[bc % PSS(fs)] << 8;
 		return (clst & 1) ? (wc >> 4) : (wc & 0xFFF);
-
+#if _FS_TINY < 2
 	case FS_FAT16 :
 		if (move_window(fs, fs->fatbase + (clst / (SS(fs) / 2)))) break;
 		p = &fs->win[clst * 2 % SS(fs)];
@@ -848,6 +862,7 @@ DWORD get_fat (	/* 0xFFFFFFFF:Disk error, 1:Internal error, Else:Cluster status 
 		if (move_window(fs, fs->fatbase + (clst / (SS(fs) / 4)))) break;
 		p = &fs->win[clst * 4 % SS(fs)];
 		return LD_DWORD(p) & 0x0FFFFFFF;
+#endif
 	}
 
 	return 0xFFFFFFFF;	/* An error occurred at the disk I/O layer */
@@ -1084,7 +1099,7 @@ FRESULT dir_sdi (
 		dj->clust = clst;
 		if (idx >= dj->fs->n_rootdir)		/* Index is out of range */
 			return FR_INT_ERR;
-		dj->sect = dj->fs->dirbase + idx / (SS(dj->fs) / SZ_DIR);	/* Sector# */
+		dj->sect = S2PS(dj->fs->dirbase) + idx / (PSS(dj->fs) / SZ_DIR);	/* Partial Sector# */
 	}
 	else {				/* Dynamic table (sub-dirs or root-dir in FAT32) */
 		ic = SS(dj->fs) / SZ_DIR * dj->fs->csize;	/* Entries per cluster */
@@ -1096,10 +1111,10 @@ FRESULT dir_sdi (
 			idx -= ic;
 		}
 		dj->clust = clst;
-		dj->sect = clust2sect(dj->fs, clst) + idx / (SS(dj->fs) / SZ_DIR);	/* Sector# */
+		dj->sect = S2PS(clust2sect(dj->fs, clst)) + idx / (PSS(dj->fs) / SZ_DIR);	/* Sector# */
 	}
 
-	dj->dir = dj->fs->win + (idx % (SS(dj->fs) / SZ_DIR)) * SZ_DIR;	/* Ptr to the entry in the sector */
+	dj->dir = FSWIN(dj->fs) + (idx % (PSS(dj->fs) / SZ_DIR)) * SZ_DIR;	/* Ptr to the entry in the sector */
 
 	return FR_OK;	/* Seek succeeded */
 }
@@ -1126,7 +1141,7 @@ FRESULT dir_next (	/* FR_OK:Succeeded, FR_NO_FILE:End of table, FR_DENIED:EOT an
 	if (!i || !dj->sect)	/* Report EOT when index has reached 65535 */
 		return FR_NO_FILE;
 
-	if (!(i % (SS(dj->fs) / SZ_DIR))) {	/* Sector changed? */
+	if (!(i % (PSS(dj->fs) / SZ_DIR))) {	/* Sector changed? */
 		dj->sect++;					/* Next sector */
 
 		if (dj->clust == 0) {	/* Static table */
@@ -1161,13 +1176,13 @@ FRESULT dir_next (	/* FR_OK:Succeeded, FR_NO_FILE:End of table, FR_DENIED:EOT an
 #endif
 				}
 				dj->clust = clst;				/* Initialize data for new cluster */
-				dj->sect = clust2sect(dj->fs, clst);
+				dj->sect = S2PS(clust2sect(dj->fs, clst));
 			}
 		}
 	}
 
 	dj->index = i;
-	dj->dir = dj->fs->win + (i % (SS(dj->fs) / SZ_DIR)) * SZ_DIR;
+	dj->dir = FSWIN(dj->fs) + (i % (PSS(dj->fs) / SZ_DIR)) * SZ_DIR;
 
 	return FR_OK;
 }
@@ -2013,20 +2028,29 @@ FRESULT follow_path (	/* FR_OK(0): successful, !=0: error code */
 /* Load a sector and check if it is an FAT Volume Boot Record            */
 /*-----------------------------------------------------------------------*/
 
+static uint8_t *
+pt_get(FATFS *fs, DWORD sect, int offset)
+{
+    DWORD psect;
+
+    psect = S2PS(sect) + offset / PSS(fs);
+    if (disk_read(fs->drv, FSWIN(fs), psect, 1) != RES_OK)	/* Load boot record */
+      return NULL;
+    return FSWIN(fs) + offset % PSS(fs);
+}
+
 static
 BYTE check_fs (	/* 0:FAT-VBR, 1:Any BR but not FAT, 2:Not a BR, 3:Disk error */
 	FATFS *fs,	/* File system object */
 	DWORD sect	/* Sector# (lba) to check if it is an FAT boot record or not */
 )
 {
-	if (disk_read(fs->drv, fs->win, sect, 1) != RES_OK)	/* Load boot record */
-		return 3;
-	if (LD_WORD(&fs->win[BS_55AA]) != 0xAA55)		/* Check record signature (always placed at offset 510 even if the sector size is >512) */
+	if (LD_WORD(pt_get(fs, sect, BS_55AA)) != 0xAA55)		/* Check record signature (always placed at offset 510 even if the sector size is >512) */
 		return 2;
 
-	if ((LD_DWORD(&fs->win[BS_FilSysType]) & 0xFFFFFF) == 0x544146)	/* Check "FAT" string */
+	if ((LD_DWORD(pt_get(fs, sect, BS_FilSysType)) & 0xFFFFFF) == 0x544146)	/* Check "FAT" string */
 		return 0;
-	if ((LD_DWORD(&fs->win[BS_FilSysType32]) & 0xFFFFFF) == 0x544146)
+	if ((LD_DWORD(pt_get(fs, sect, BS_FilSysType32)) & 0xFFFFFF) == 0x544146)
 		return 0;
 
 	return 1;
@@ -2107,7 +2131,7 @@ FRESULT chk_mounted (	/* FR_OK(0): successful, !=0: any error occurred */
 		/* Check the partition listed in the partition table */
 		pi = LD2PT(vol);
 		if (pi) pi--;
-		tbl = &fs->win[MBR_Table + pi * SZ_PTE];/* Partition table */
+		tbl = pt_get(fs, bsect, MBR_Table + pi * SZ_PTE);/* Partition table */
 		if (tbl[4]) {						/* Is the partition existing? */
 			bsect = LD_DWORD(&tbl[8]);		/* Partition offset in LBA */
 			fmt = check_fs(fs, bsect);		/* Check the partition */
@@ -2118,27 +2142,27 @@ FRESULT chk_mounted (	/* FR_OK(0): successful, !=0: any error occurred */
 
 	/* An FAT volume is found. Following code initializes the file system object */
 
-	if (LD_WORD(fs->win+BPB_BytsPerSec) != SS(fs))		/* (BPB_BytsPerSec must be equal to the physical sector size) */
+	if (LD_WORD(pt_get(fs, bsect, BPB_BytsPerSec)) != SS(fs))		/* (BPB_BytsPerSec must be equal to the physical sector size) */
 		return FR_NO_FILESYSTEM;
 
-	fasize = LD_WORD(fs->win+BPB_FATSz16);				/* Number of sectors per FAT */
-	if (!fasize) fasize = LD_DWORD(fs->win+BPB_FATSz32);
+	fasize = LD_WORD(pt_get(fs, bsect, BPB_FATSz16));				/* Number of sectors per FAT */
+	if (!fasize) fasize = LD_DWORD(pt_get(fs, bsect, BPB_FATSz32));
 	fs->fsize = fasize;
 
-	fs->n_fats = b = fs->win[BPB_NumFATs];				/* Number of FAT copies */
+	fs->n_fats = b = *pt_get(fs, bsect, BPB_NumFATs);				/* Number of FAT copies */
 	if (b != 1 && b != 2) return FR_NO_FILESYSTEM;		/* (Must be 1 or 2) */
 	fasize *= b;										/* Number of sectors for FAT area */
 
-	fs->csize = b = fs->win[BPB_SecPerClus];			/* Number of sectors per cluster */
+	fs->csize = b = *pt_get(fs, bsect, BPB_SecPerClus);			/* Number of sectors per cluster */
 	if (!b || (b & (b - 1))) return FR_NO_FILESYSTEM;	/* (Must be power of 2) */
 
-	fs->n_rootdir = LD_WORD(fs->win+BPB_RootEntCnt);	/* Number of root directory entries */
+	fs->n_rootdir = LD_WORD(pt_get(fs, bsect, BPB_RootEntCnt));	/* Number of root directory entries */
 	if (fs->n_rootdir % (SS(fs) / SZ_DIR)) return FR_NO_FILESYSTEM;	/* (BPB_RootEntCnt must be sector aligned) */
 
-	tsect = LD_WORD(fs->win+BPB_TotSec16);				/* Number of sectors on the volume */
-	if (!tsect) tsect = LD_DWORD(fs->win+BPB_TotSec32);
+	tsect = LD_WORD(pt_get(fs, bsect, BPB_TotSec16));				/* Number of sectors on the volume */
+	if (!tsect) tsect = LD_DWORD(pt_get(fs, bsect, BPB_TotSec32));
 
-	nrsv = LD_WORD(fs->win+BPB_RsvdSecCnt);				/* Number of reserved sectors */
+	nrsv = LD_WORD(pt_get(fs, bsect, BPB_RsvdSecCnt));				/* Number of reserved sectors */
 	if (!nrsv) return FR_NO_FILESYSTEM;					/* (BPB_RsvdSecCnt must not be 0) */
 
 	/* Determine the FAT sub type */
@@ -2156,7 +2180,7 @@ FRESULT chk_mounted (	/* FR_OK(0): successful, !=0: any error occurred */
 	fs->fatbase = bsect + nrsv; 						/* FAT start sector */
 	if (fmt == FS_FAT32) {
 		if (fs->n_rootdir) return FR_NO_FILESYSTEM;		/* (BPB_RootEntCnt must be 0) */
-		fs->dirbase = LD_DWORD(fs->win+BPB_RootClus);	/* Root directory start cluster */
+		fs->dirbase = LD_DWORD(pt_get(fs, bsect, BPB_RootClus));	/* Root directory start cluster */
 		szbfat = fs->n_fatent * 4;						/* (Required FAT size) */
 	} else {
 		if (!fs->n_rootdir)	return FR_NO_FILESYSTEM;	/* (BPB_RootEntCnt must not be 0) */
@@ -2422,7 +2446,7 @@ FRESULT f_read (
 {
 	FRESULT res;
 	DWORD clst, sect, remain;
-	UINT rcnt, cc;
+	UINT rcnt, cc, pcsize;
 	BYTE csect, *rbuff = buff;
 
 
@@ -2437,10 +2461,11 @@ FRESULT f_read (
 	remain = fp->fsize - fp->fptr;
 	if (btr > remain) btr = (UINT)remain;		/* Truncate btr by remaining bytes */
 
+	pcsize = S2PS(fp->fs->csize);
 	for ( ;  btr;								/* Repeat until all data read */
 		rbuff += rcnt, fp->fptr += rcnt, *br += rcnt, btr -= rcnt) {
-		if ((fp->fptr % SS(fp->fs)) == 0) {		/* On the sector boundary? */
-			csect = (BYTE)(fp->fptr / SS(fp->fs) & (fp->fs->csize - 1));	/* Sector offset in the cluster */
+		if ((fp->fptr % PSS(fp->fs)) == 0) {		/* On the sector boundary? */
+			csect = (BYTE)(fp->fptr / PSS(fp->fs) & (pcsize - 1));	/* Partial Sector offset in the cluster */
 			if (!csect) {						/* On the cluster boundary? */
 				if (fp->fptr == 0) {			/* On the top of the file? */
 					clst = fp->sclust;			/* Follow from the origin */
@@ -2456,13 +2481,13 @@ FRESULT f_read (
 				if (clst == 0xFFFFFFFF) ABORT(fp->fs, FR_DISK_ERR);
 				fp->clust = clst;				/* Update current cluster */
 			}
-			sect = clust2sect(fp->fs, fp->clust);	/* Get current sector */
+			sect = S2PS(clust2sect(fp->fs, fp->clust));	/* Get current sector */
 			if (!sect) ABORT(fp->fs, FR_INT_ERR);
 			sect += csect;
-			cc = btr / SS(fp->fs);				/* When remaining bytes >= sector size, */
+			cc = btr / PSS(fp->fs);				/* When remaining bytes >= sector size, */
 			if (cc) {							/* Read maximum contiguous sectors directly */
-				if (csect + cc > fp->fs->csize)	/* Clip at cluster boundary */
-					cc = fp->fs->csize - csect;
+				if (csect + cc > pcsize)	/* Clip at cluster boundary */
+					cc = pcsize - csect;
 				if (disk_read(fp->fs->drv, rbuff, sect, (BYTE)cc) != RES_OK)
 					ABORT(fp->fs, FR_DISK_ERR);
 #if !_FS_READONLY && _FS_MINIMIZE <= 2			/* Replace one of the read sectors with cached data if it contains a dirty sector */
@@ -2474,7 +2499,7 @@ FRESULT f_read (
 					mem_cpy(rbuff + ((fp->dsect - sect) * SS(fp->fs)), fp->buf, SS(fp->fs));
 #endif
 #endif
-				rcnt = SS(fp->fs) * cc;			/* Number of bytes transferred */
+				rcnt = PSS(fp->fs) * cc;			/* Number of bytes transferred */
 				continue;
 			}
 #if !_FS_TINY
@@ -2492,12 +2517,12 @@ FRESULT f_read (
 #endif
 			fp->dsect = sect;
 		}
-		rcnt = SS(fp->fs) - ((UINT)fp->fptr % SS(fp->fs));	/* Get partial sector data from sector buffer */
+		rcnt = PSS(fp->fs) - ((UINT)fp->fptr % PSS(fp->fs));	/* Get partial sector data from sector buffer */
 		if (rcnt > btr) rcnt = btr;
 #if _FS_TINY
 		if (move_window(fp->fs, fp->dsect))		/* Move sector window */
 			ABORT(fp->fs, FR_DISK_ERR);
-		mem_cpy(rbuff, &fp->fs->win[fp->fptr % SS(fp->fs)], rcnt);	/* Pick partial sector */
+		mem_cpy(rbuff, &FSWIN(fp->fs)[fp->fptr % PSS(fp->fs)], rcnt);	/* Pick partial sector */
 #else
 		mem_cpy(rbuff, &fp->buf[fp->fptr % SS(fp->fs)], rcnt);	/* Pick partial sector */
 #endif
@@ -4144,5 +4169,5 @@ void *f_getbuffer(FATFS *fs)
 {
   move_window(fs, 0);
   fs->winsect = 0;
-  return fs->win;
+  return FSWIN(fs);
 }

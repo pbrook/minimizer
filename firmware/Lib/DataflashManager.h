@@ -58,6 +58,8 @@
 		 *  storage media (Dataflash) using a different native block size. Do not change this value.
 		 */
 		#define VIRTUAL_MEMORY_BLOCK_SIZE           512
+		/* Block size to use for RAM reads/writes (nasty hack!) */
+		#define VRAM_BLOCK_SIZE           256
 
 		/** Total number of blocks of the virtual memory for reporting to the host as the device's total capacity. Do not
 		 *  change this value; change VIRTUAL_MEMORY_BYTES instead to alter the media size.

@@ -38,7 +38,7 @@ blink(uint8_t led)
 }
 
 #if 0
-static void
+void
 flash(void)
 {
   LEDs_SetAllLEDs(LEDS_LED1);
@@ -532,7 +532,6 @@ flash_hex(bool verify)
 	      len--;
 	  }
       } else { // Unknown record type
-	  blink(LEDS_LED1);
 	  goto fail;
       }
       if (!safe_read(data, 3))
@@ -628,6 +627,7 @@ program_minimus(void)
   LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED2);
   while (mm_button())
     Delay_MS(1);
+  LEDs_SetAllLEDs(0);
 
   if (mm_StartISP())
     goto fail;
@@ -636,7 +636,6 @@ program_minimus(void)
   mm_EraseChip();
   if (!mm_ProgramFlash())
     goto fail;
-  blink(LEDS_LED1);
   for (i = 0; i < 4; i++) {
       if (seen_fuse & (1 << i)) {
 	  mm_SetFuse(i, config_fuse[i]);

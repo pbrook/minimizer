@@ -103,7 +103,11 @@ typedef struct {
 	DWORD	dirbase;		/* Root directory start sector (FAT32:Cluster#) */
 	DWORD	database;		/* Data start sector */
 	DWORD	winsect;		/* Current sector appearing in the win[] */
+#if _FS_TINY == 2
+	BYTE	partwin[_MAX_SS / 2];
+#else
 	BYTE	win[_MAX_SS];	/* Disk access window for Directory, FAT (and Data on tiny cfg) */
+#endif
 } FATFS;
 
 
