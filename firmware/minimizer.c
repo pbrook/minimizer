@@ -4,6 +4,9 @@
 
 #include "minimizer.h"
 
+#define FUSE_WRITE_DELAY 10
+#define CHIP_ERASE_DELAY 100
+
 #define AUDIO_SCALE 12
 
 #define BEEP_MASK (1 << 7)
@@ -107,7 +110,7 @@ mm_SetFuse(enum fuse_id id, uint8_t val)
   if (old == val)
     return true;
   do_cmd(write_cmd | val);
-  Delay_MS(10);
+  Delay_MS(FUSE_WRITE_DELAY);
   old = do_cmd(read_cmd);
   return (old == val);
 }
@@ -116,7 +119,7 @@ static void
 mm_EraseChip(void)
 {
   do_cmd(0xac977f00ul);
-  Delay_MS(10);
+  Delay_MS(CHIP_ERASE_DELAY);
 }
 
 bool isp_power;
@@ -414,7 +417,6 @@ mm_WritePage(uint32_t addr)
   cmd = 0x4c000000ul;
   cmd |= ((addr & config_page_mask) << 7) & 0x00ffff00ul;
   do_cmd(cmd);
-  Delay_MS(10);
   while((do_cmd(0xf0000000ul) & 1) == 1)
     /* No-op */;
 }
@@ -528,7 +530,6 @@ flash_hex(bool verify)
 		    cmd = 0x40000000ul;
 		  cmd |= (addr << 7) & load_addr_mask;
 		  do_cmd(cmd | i);
-		  Delay_MS(1);
 	      }
 
 	      last_addr = addr;
