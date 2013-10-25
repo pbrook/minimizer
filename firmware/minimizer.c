@@ -38,8 +38,21 @@ blink(uint8_t led)
 }
 
 #if 0
+static void
+flash(void)
+{
+  LEDs_SetAllLEDs(LEDS_LED1);
+  Delay_MS(200);
+  LEDs_SetAllLEDs(0);
+  Delay_MS(200);
+}
+#endif
+
+#if _USE_LFN
 WCHAR ff_convert (WCHAR c, UINT i)
 {
+  if (c > 127)
+    return '?';
   return c;
 }
 
@@ -185,26 +198,37 @@ static uint8_t config_fuse[4];
 static uint8_t seen_fuse;
 static uint32_t config_page_mask;
 
-#define VAR_NAME_MAX_LEN 4
+#define VAR_NAME_MAX_LEN 5
 static char var_name[VAR_NAME_MAX_LEN + 1];
 static char var_value[_MAX_LFN + 1];
 
-/* Return false on error.  */
+/* Return false on EOF.  Zero length var_value indicates parse error */
 static bool
 parse_line(void)
 {
   char *p;
   UINT count;
   int len;
+  bool comment;
 
   var_value[0] = 0;
   p = var_name;
   len = VAR_NAME_MAX_LEN;
+  comment = false;
 
   while (true) {
       f_read(&fh, p, 1, &count);
       if (count == 0)
 	return false;
+      if (comment) {
+	  if (*p == '\n')
+	    comment = false;
+	  continue;
+      }
+      if (*p == '#' && p == var_name) {
+	  comment = true;
+	  continue;
+      }
       if (*p == '=') {
 	  *p = 0;
 	  p = var_value;
@@ -213,10 +237,12 @@ parse_line(void)
 	  /* Ignore character.  */
       } else if (*p == '\n') {
 	  *p = 0;
-	  return var_value[0] != 0;
+	  return true;
       } else {
-	  if (len == 0)
-	    return false;
+	  if (len == 0) {
+	      var_value[0] = 0;
+	      return true;
+	  }
 	  p++;
 	  len--;
       }
@@ -230,7 +256,7 @@ parse_number(const char *s)
   int val;
   char c;
   val = 0;
-  if (s[0] == 0) {
+  if (s[0] == '0') {
       if (s[1] != 'x')
 	return -1;
       s += 2;
@@ -242,7 +268,7 @@ parse_number(const char *s)
 	    val = (val << 4) | (c - '0');
 	  else if (c >= 'a' && c <= 'f')
 	    val = (val << 4) | (c + 10 - 'a');
-	  else if (c >= 'A' && c <= 'A')
+	  else if (c >= 'A' && c <= 'F')
 	    val = (val << 4) | (c + 10 - 'A');
 	  else
 	    return -1;
@@ -253,7 +279,7 @@ parse_number(const char *s)
 	if (c == 0)
 	  return val;
 	if (c >= '0' && c <= '9')
-	  val = (val * 10) | (c - '0');
+	  val = (val * 10) + (c - '0');
 	else
 	  return -1;
       }
@@ -275,14 +301,12 @@ mm_VerifyID(void)
     id = (id << 8) | do_cmd(0x30000000 | (i << 8));
 
   for (i = 0; i < 6; i++) {
-      val = id >> (4*(5 - i));
+      val = (id >> (4*(5 - i))) & 0xf;
       if (val >= 10)
-	config_filename[i] = val + 'A' - 10;
+	config_filename[i] = val + 'a' - 10;
       else
 	config_filename[i] = val + '0';
   }
-  if (id == 0 || id == 0x1e9206)
-    blink(LEDS_LED1);
   config_filename[6] = '.';
   config_filename[7] = 'c';
   config_filename[8] = 'f';
@@ -297,36 +321,38 @@ mm_VerifyID(void)
   config_page_mask = 0;
 
   while (parse_line()) {
-      if (strcmp_p(var_name, PSTR("lfuse"))) {
+      if (var_name[0] == 0)
+	return false;
+      if (strcmp_p(var_name, PSTR("lfuse")) == 0) {
 	  i = parse_number(var_value);
 	  if (i < 0)
 	    goto fail;
 	  config_fuse[FUSE_LOW] = i;
 	  seen_fuse |= 1 << FUSE_LOW;
-      } else if (strcmp_p(var_name, PSTR("hfuse"))) {
+      } else if (strcmp_p(var_name, PSTR("hfuse")) == 0) {
 	  i = parse_number(var_value);
 	  if (i < 0)
 	    goto fail;
 	  config_fuse[FUSE_HIGH] = i;
 	  seen_fuse |= 1 << FUSE_HIGH;
-      } else if (strcmp_p(var_name, PSTR("efuse"))) {
+      } else if (strcmp_p(var_name, PSTR("efuse")) == 0) {
 	  i = parse_number(var_value);
 	  if (i < 0)
 	    goto fail;
 	  config_fuse[FUSE_EXT] = i;
 	  seen_fuse |= 1 << FUSE_EXT;
-      } else if (strcmp_p(var_name, PSTR("lock"))) {
+      } else if (strcmp_p(var_name, PSTR("lock")) == 0) {
 	  i = parse_number(var_value);
 	  if (i < 0)
 	    goto fail;
 	  config_fuse[FUSE_LOCK] = i;
 	  seen_fuse |= 1 << FUSE_LOCK;
-      } else if (strcmp_p(var_name, PSTR("page"))) {
+      } else if (strcmp_p(var_name, PSTR("page")) == 0) {
 	  i = parse_number(var_value);
 	  if (i < 0)
 	    goto fail;
 	  config_page_mask = ~(uint32_t)(i - 1);
-      } else if (strcmp_p(var_name, PSTR("file"))) {
+      } else if (strcmp_p(var_name, PSTR("file")) == 0) {
 	  strcpy(config_filename, var_value);
       }
   }
@@ -346,19 +372,23 @@ parse_hex(const char *s)
   char c;
   uint8_t val;
 
-  c = s[0] & ~0x20;
-  if (c >='0' && c <= 9)
+  c = s[0];
+  if (c >= '0' && c <= '9')
     val = c - '0';
-  else if (c >= 'A' && c <= 'Z')
+  else if (c >= 'A' && c <= 'F')
     val = c + 10 - 'A';
+  else if (c >= 'a' && c <= 'f')
+    val = c + 10 - 'a';
   else
     return -1;
   val <<= 4;
-  c = s[1] & ~0x20;
-  if (c >='0' && c <= 9)
+  c = s[1];
+  if (c >='0' && c <= '9')
     val += c - '0';
-  else if (c >= 'A' && c <= 'Z')
+  else if (c >= 'A' && c <= 'F')
     val += c + 10 - 'A';
+  else if (c >= 'a' && c <= 'f')
+    val += c + 10 - 'a';
   else
     return -1;
   return val;
@@ -383,6 +413,7 @@ mm_WritePage(uint32_t addr)
   cmd = 0x4c000000ul;
   cmd |= ((addr & config_page_mask) << 7) & 0x00ffff00ul;
   do_cmd(cmd);
+  Delay_MS(10);
   while((do_cmd(0xf0000000ul) & 1) == 1)
     /* No-op */;
 }
@@ -456,7 +487,7 @@ flash_hex(bool verify)
 	  if (i < 0)
 	    goto fail;
 	  addr_high |= (uint32_t)i << 16;
-      } else if (data[8] == '1') { // Data
+      } else if (data[8] == '0') { // Data
 	  addr += addr_high;
 	  if (first) {
 	      last_addr = addr;
@@ -469,7 +500,7 @@ flash_hex(bool verify)
 		  if (!verify)
 		    mm_WritePage(last_addr);
 		  if ((changed >> 17) != 0)
-		    do_cmd(0x4d000000 | ((addr >> 9) & 0xff00));
+		    do_cmd(0x4d000000 | ((addr >> 9) & 0xff00ul));
 	      }
 	      if (!safe_read(data, 2))
 		goto fail;
@@ -493,6 +524,7 @@ flash_hex(bool verify)
 		    cmd = 0x40000000ul;
 		  cmd |= (addr << 7) & load_addr_mask;
 		  do_cmd(cmd | i);
+		  Delay_MS(1);
 	      }
 
 	      last_addr = addr;
@@ -500,15 +532,16 @@ flash_hex(bool verify)
 	      len--;
 	  }
       } else { // Unknown record type
+	  blink(LEDS_LED1);
 	  goto fail;
       }
       if (!safe_read(data, 3))
 	goto fail;
-      if (data[3] == '\r') {
+      if (data[2] == '\r') {
 	  if (!safe_read(data + 2, 1))
 	    goto fail;
       }
-      if (data[3] != '\n')
+      if (data[2] != '\n')
 	goto fail;
   }
   if (!first) {
@@ -530,10 +563,8 @@ mm_ProgramFlash(void)
 {
   if (!flash_hex(false))
     return false;
-#if 0
   if (!flash_hex(true))
     return false;
-#endif
   return true;
 }
 
@@ -602,12 +633,10 @@ program_minimus(void)
     goto fail;
   if (!mm_VerifyID())
     goto fail;
-  blink(LEDS_LED1);
   mm_EraseChip();
-  if (mm_StartISP())
-    goto fail;
   if (!mm_ProgramFlash())
     goto fail;
+  blink(LEDS_LED1);
   for (i = 0; i < 4; i++) {
       if (seen_fuse & (1 << i)) {
 	  mm_SetFuse(i, config_fuse[i]);
