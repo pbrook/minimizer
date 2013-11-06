@@ -23,7 +23,7 @@
 #define DIP_PORTC_MASK ((1<<4) | (1<<5) | (1<<7))
 
 #define DIP_BUTTON_MASK (1 << 4)
-#define DIP_BITTON_PIN PINC
+#define DIP_BUTTON_PIN PINC
 
 // DIP2
 #define DIP_MSD_MASK (1 << 5)

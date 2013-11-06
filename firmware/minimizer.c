@@ -32,7 +32,7 @@ static void
 blink(uint8_t led)
 {
   int i;
-  for (i = 0; i < 5; i++) {
+  for (i = 0; i < 10; i++) {
       LEDs_SetAllLEDs(led);
       Delay_MS(100);
       LEDs_SetAllLEDs(0);
@@ -575,7 +575,11 @@ mm_ProgramFlash(void)
 static bool
 mm_button(void)
 {
-  return (Buttons_GetStatus() & BUTTONS_BUTTON1) != 0;
+  if ((Buttons_GetStatus() & BUTTONS_BUTTON1) != 0)
+    return true;
+  if ((DIP_BUTTON_PIN & DIP_BUTTON_MASK) == 0)
+    return true;
+  return false;
 }
 
 FATFS fatfs;
