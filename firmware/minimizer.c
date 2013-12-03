@@ -32,6 +32,7 @@ static void
 blink(uint8_t led)
 {
   int i;
+
   for (i = 0; i < 10; i++) {
       LEDs_SetAllLEDs(led);
       Delay_MS(100);
@@ -589,8 +590,10 @@ void minimizer_init(void)
   /* DIP switches.  */
   DDRB &= ~DIP_PORTB_MASK;
   DDRC &= ~DIP_PORTC_MASK;
+  DDRD &= ~DIP_PORTC_MASK;
   PORTB |= DIP_PORTB_MASK;
   PORTC |= DIP_PORTC_MASK;
+  PORTD |= DIP_PORTC_MASK;
 
   Buttons_Init();
 
@@ -627,15 +630,18 @@ program_minimus(void)
   if (!mm_button())
     return false;
 
-  for (i = 0; i < 5; i++) {
-      if (!mm_button())
-	return true;
-      LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED2);
-      Delay_MS(100);
-      if (!mm_button())
-	return true;
-      LEDs_SetAllLEDs(0);
-      Delay_MS(100);
+  if ((DIP_DEBUG_PIN & DIP_DEBUG_MASK) != 0)
+    {
+      for (i = 0; i < 5; i++) {
+	  if (!mm_button())
+	    return true;
+	  LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED2);
+	  Delay_MS(100);
+	  if (!mm_button())
+	    return true;
+	  LEDs_SetAllLEDs(0);
+	  Delay_MS(100);
+      }
   }
   LEDs_SetAllLEDs(LEDS_LED1 | LEDS_LED2);
   while (mm_button())

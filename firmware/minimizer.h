@@ -21,6 +21,7 @@
 
 #define DIP_PORTB_MASK ((1<<4) | (1<<5) | (1<<6))
 #define DIP_PORTC_MASK ((1<<4) | (1<<5) | (1<<7))
+#define DIP_PORTD_MASK ((1<<4))
 
 #define DIP_BUTTON_MASK (1 << 4)
 #define DIP_BUTTON_PIN PINC
@@ -28,6 +29,10 @@
 // DIP2
 #define DIP_MSD_MASK (1 << 5)
 #define DIP_MSD_PIN PINC
+
+// DIP3
+#define DIP_DEBUG_MASK (1 << 4)
+#define DIP_DEBUG_PIN PIND
 
 // DIP4
 #define DIP_SILENT_MASK (1 << 7)
