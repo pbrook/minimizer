@@ -1,4 +1,4 @@
-Cmp-Mod V01 Created by CvPcb (2013-jul-07)-stable date = Sat 14 Dec 2013 14:05:10 GMT
+Cmp-Mod V01 Created by CvPcb (2013-jul-07)-stable date = Sat 14 Dec 2013 20:53:15 GMT
 
 BeginCmp
 TimeStamp = /522DC9F5;
@@ -15,6 +15,13 @@ IdModule  = SM1206;
 EndCmp
 
 BeginCmp
+TimeStamp = /52ACCEA3;
+Reference = C3;
+ValeurCmp = 100n;
+IdModule  = C2;
+EndCmp
+
+BeginCmp
 TimeStamp = /522FD226;
 Reference = D1;
 ValeurCmp = LED;
@@ -25,7 +32,7 @@ BeginCmp
 TimeStamp = /522B3C4E;
 Reference = P1;
 ValeurCmp = ISP;
-IdModule  = pin_array_3x2;
+IdModule  = AVRISP6;
 EndCmp
 
 BeginCmp
@@ -33,6 +40,69 @@ TimeStamp = /522FDA85;
 Reference = P2;
 ValeurCmp = CONN_1;
 IdModule  = PIN_ARRAY_1;
+EndCmp
+
+BeginCmp
+TimeStamp = /52AC95FE;
+Reference = P3;
+ValeurCmp = CONN_10;
+IdModule  = SIL-10;
+EndCmp
+
+BeginCmp
+TimeStamp = /52AC960D;
+Reference = P4;
+ValeurCmp = CONN_10;
+IdModule  = SIL-10;
+EndCmp
+
+BeginCmp
+TimeStamp = /52AC95E0;
+Reference = P5;
+ValeurCmp = CONN_10;
+IdModule  = SIL-10;
+EndCmp
+
+BeginCmp
+TimeStamp = /52AC95EF;
+Reference = P6;
+ValeurCmp = CONN_10;
+IdModule  = SIL-10;
+EndCmp
+
+BeginCmp
+TimeStamp = /52ACB9CA;
+Reference = P7;
+ValeurCmp = CONN_7;
+IdModule  = SIL-7;
+EndCmp
+
+BeginCmp
+TimeStamp = /52ACC626;
+Reference = P8;
+ValeurCmp = CONN_1;
+IdModule  = HOLE3;
+EndCmp
+
+BeginCmp
+TimeStamp = /52ACC617;
+Reference = P9;
+ValeurCmp = CONN_1;
+IdModule  = HOLE3;
+EndCmp
+
+BeginCmp
+TimeStamp = /52ACC608;
+Reference = P10;
+ValeurCmp = CONN_1;
+IdModule  = HOLE3;
+EndCmp
+
+BeginCmp
+TimeStamp = /52ACC5F9;
+Reference = P11;
+ValeurCmp = CONN_1;
+IdModule  = HOLE3;
 EndCmp
 
 BeginCmp
@@ -129,8 +199,8 @@ EndCmp
 BeginCmp
 TimeStamp = /522DDF53;
 Reference = SW1;
-ValeurCmp = SW_DIP_8;
-IdModule  = SWDIP8;
+ValeurCmp = SW_DIP_6;
+IdModule  = SWDIP6;
 EndCmp
 
 BeginCmp
@@ -190,17 +260,10 @@ IdModule  = POGO;
 EndCmp
 
 BeginCmp
-TimeStamp = /522AFA7A;
+TimeStamp = /52AC8CA9;
 Reference = U1;
 ValeurCmp = MINIMUS;
-IdModule  = SIL-12-ELL;
-EndCmp
-
-BeginCmp
-TimeStamp = /522AFA7E;
-Reference = U2;
-ValeurCmp = MINIMUS;
-IdModule  = SIL-12-ELL;
+IdModule  = MINIMUS;
 EndCmp
 
 BeginCmp
