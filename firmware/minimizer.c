@@ -612,6 +612,16 @@ void minimizer_init(void)
   update_power();
 }
 
+void do_usb_eject(void)
+{
+  USB_Disable();
+  LEDs_SetAllLEDs(0);
+  if ((DIP_MSD_PIN & DIP_MSD_MASK) != 0) {
+    wdt_enable(WDTO_500MS);
+  }
+  while(1);
+}
+
 /* Returns true if LEDS have been changed.  */
 bool
 program_minimus(void)

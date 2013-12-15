@@ -48,5 +48,6 @@
 
 void minimizer_init(void);
 void minimizer_set_power(bool on);
+void do_usb_eject(void);
 
 #endif

@@ -80,6 +80,32 @@ static SCSI_Request_Sense_Response_t SenseData =
 	};
 
 
+/** Command processing for an issued START STOP UNIT command.
+ *
+ *  \param[in] MSInterfaceInfo  Pointer to the Mass Storage class interface structure that the command is associated with
+ *
+ *  \return Boolean true if the command completed successfully, false otherwise.
+ */
+static bool SCSI_Command_StartStopUnit(USB_ClassInfo_MS_Device_t* const MSInterfaceInfo)
+{
+	uint8_t state = MSInterfaceInfo->State.CommandBlock.SCSICommandData[4];
+
+	if (state > 3)
+	{
+		/* Optional but unsupported bits set - update the SENSE key and fail the request */
+		SCSI_SET_SENSE(SCSI_SENSE_KEY_ILLEGAL_REQUEST,
+		               SCSI_ASENSE_INVALID_FIELD_IN_CDB,
+		               SCSI_ASENSEQ_NO_QUALIFIER);
+
+		return false;
+	}
+
+	if ((state & 1) == 0) {
+	    SCSI_Stop();
+	}
+	return true;
+}
+
 /** Main routine to process the SCSI command located in the Command Block Wrapper read from the host. This dispatches
  *  to the appropriate SCSI command handling routine if the issued command is supported by the device, else it returns
  *  a command failure due to a ILLEGAL REQUEST.
@@ -122,6 +148,9 @@ bool SCSI_DecodeSCSICommand(USB_ClassInfo_MS_Device_t* const MSInterfaceInfo)
 			/* These commands should just succeed, no handling required */
 			CommandSuccess = true;
 			MSInterfaceInfo->State.CommandBlock.DataTransferLength = 0;
+			break;
+		case SCSI_CMD_START_STOP_UNIT:
+			CommandSuccess = SCSI_Command_StartStopUnit(MSInterfaceInfo);
 			break;
 		default:
 			/* Update the SENSE key to reflect the invalid command */

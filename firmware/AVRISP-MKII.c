@@ -40,6 +40,8 @@
 
 #if defined(MINIMIZER)
 bool storage_mode = false;
+// Hack to wait for a while after we are told to power down.
+static int reset_wait;
 #else
 #define storage_mode false
 #endif
@@ -115,6 +117,14 @@ int main(void)
 #ifdef MINIMIZER
 		if (!storage_mode && program_minimus())
 		  restore_leds();
+
+		if (reset_wait)
+		  {
+		    reset_wait--;
+		    if (reset_wait == 0)
+		      do_usb_eject();
+		    Delay_MS(1);
+		  }
 #endif
 	}
 }
@@ -277,3 +287,9 @@ bool CALLBACK_MS_Device_SCSICommandReceived(USB_ClassInfo_MS_Device_t* const MSI
 	return CommandSuccess;
 }
 
+#if defined(MINIMIZER)
+void SCSI_Stop(void)
+{
+  reset_wait = 1000;
+}
+#endif
